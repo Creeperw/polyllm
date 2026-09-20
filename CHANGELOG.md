@@ -2,6 +2,43 @@
 
 > This project is a fork of [OAI Compatible Provider for Copilot](https://github.com/JohnnyZ93/oai-compatible-copilot), published as **PolyLLM** (`creeperw.polyllm`). Entries below 0.4.3 come from the upstream project.
 
+## 0.6.0 (2026-09-21)
+
+### Provider query center
+
+- Add three clearly separated query types: **account balance**, **plan usage**, and **organization cost**.
+- Add official OpenAI organization usage and cost presets.
+- Add official Anthropic organization usage and cost presets.
+- Aggregate daily usage and cost buckets across the selected reporting window instead of displaying only the first bucket.
+- Support reporting windows of the last 24 hours, 7 days, or 30 days.
+- Keep the existing declarative expression evaluator for custom providers; configuration values are never executed as JavaScript.
+
+### Credential safety
+
+- Store provider inference API keys and organization Admin API keys separately in VS Code SecretStorage.
+- Never silently reuse an ordinary model API key for an organization report that requires Admin permission.
+- Show an actionable message when an Admin API key is missing.
+
+### Configuration UI
+
+- Redesign the query dialog with a provider-insights header and compact query-type cards.
+- Add clear guidance for Admin API keys and reporting windows.
+- Move advanced request, headers, and response extraction settings into a collapsible section.
+- Distinguish Balance, Usage, and Cost in the status bar and provider query list.
+- Preserve the existing Test, Save, Refresh, stale-result, and bilingual UI behavior.
+
+### Validation and installation
+
+- `npm run compile` passed.
+- `npm test` passed: 114 tests.
+- `npm run build` passed.
+- Install the release asset from [GitHub Releases](https://github.com/Creeperw/polyllm/releases/tag/v0.6.0) with **Extensions: Install from VSIX...**.
+
+### Maintainer and contributors
+
+- **Maintainer and 0.6.0 implementation:** [@Creeperw](https://github.com/Creeperw)
+- Thanks to the upstream [OAI Compatible Provider for Copilot](https://github.com/JohnnyZ93/oai-compatible-copilot) project and its contributors.
+
 ## 0.5.0
 
 - Feat: The model form is a **dialog** instead of a block wedged under the table.
