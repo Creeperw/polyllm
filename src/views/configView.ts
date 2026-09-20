@@ -40,6 +40,7 @@ import {
 interface BalanceState {
 	provider: string;
 	result?: {
+		queryType?: "balance" | "usage" | "cost";
 		label: string;
 		remaining?: number;
 		total?: number;
@@ -67,6 +68,7 @@ interface InitPayload {
 	commitLanguage: string;
 	models: HFModelItem[];
 	providerKeys: Record<string, boolean>;
+	adminKeys: Record<string, boolean>;
 	/** Built-in balance presets, minus the host patterns which cannot cross the webview boundary. */
 	balancePresets: {
 		id: string;
@@ -148,6 +150,7 @@ type IncomingMessage =
 			headers?: Record<string, string>;
 			sessionIdHeader?: string;
 			balance?: ProviderBalanceConfig;
+			adminApiKey?: string;
 	  }
 	| {
 			type: "updateProvider";
@@ -158,10 +161,11 @@ type IncomingMessage =
 			headers?: Record<string, string>;
 			sessionIdHeader?: string;
 			balance?: ProviderBalanceConfig;
+			adminApiKey?: string;
 	  }
 	| { type: "deleteProvider"; provider: string }
 	| { type: "refreshBalance"; provider: string }
-	| { type: "testBalance"; provider: string; balance: ProviderBalanceConfig }
+	| { type: "testBalance"; provider: string; balance: ProviderBalanceConfig; adminApiKey?: string }
 	| { type: "addModel"; model: HFModelItem }
 	| { type: "addModels"; models: HFModelItem[] }
 	| {
@@ -361,7 +365,8 @@ export class ConfigViewPanel {
 					message.apiMode,
 					message.headers,
 					message.sessionIdHeader,
-					message.balance
+					message.balance,
+					message.adminApiKey
 				);
 				break;
 			case "updateProvider":
@@ -372,14 +377,15 @@ export class ConfigViewPanel {
 					message.apiMode,
 					message.headers,
 					message.sessionIdHeader,
-					message.balance
+					message.balance,
+					message.adminApiKey
 				);
 				break;
 			case "refreshBalance":
 				await this.refreshBalance(message.provider, message.requestId);
 				break;
 			case "testBalance":
-				await this.testBalance(message.provider, message.balance);
+				await this.testBalance(message.provider, message.balance, message.adminApiKey);
 				break;
 			case "deleteProvider":
 				await this.deleteProvider(message.provider);
@@ -457,12 +463,16 @@ export class ConfigViewPanel {
 		assertValidModelCollection(models);
 
 		const providerKeys: Record<string, boolean> = {};
+		const adminKeys: Record<string, boolean> = {};
 		const providers = Array.from(new Set(models.map((m) => m.owned_by).filter(Boolean)));
 		const providerAliases = getGlobalProviderAliases(config);
 		for (const provider of providers) {
 			const key = await getProviderApiKey(this.secrets, provider, providerAliases.get(provider) ?? []);
 			if (key) {
 				providerKeys[provider] = true;
+			}
+			if (await this.secrets.get(`oaicopilot.adminApiKey.${provider}`)) {
+				adminKeys[provider] = true;
 			}
 		}
 
@@ -491,6 +501,7 @@ export class ConfigViewPanel {
 			commitLanguage,
 			models,
 			providerKeys,
+			adminKeys,
 			balancePresets: BALANCE_PRESETS.map((preset) => ({
 				id: preset.id,
 				// The panel shows these, so they follow the panel's language.
@@ -586,6 +597,7 @@ export class ConfigViewPanel {
 		headers?: Record<string, string>,
 		sessionIdHeader?: string,
 		balance?: ProviderBalanceConfig
+		, adminApiKey?: string
 	) {
 		const normalizedProvider = canonicalizeProvider(provider);
 		if (!normalizedProvider) {
@@ -613,6 +625,9 @@ export class ConfigViewPanel {
 		if (apiKey?.trim()) {
 			await this.secrets.store(`oaicopilot.apiKey.${normalizedProvider}`, apiKey.trim());
 		}
+		if (adminApiKey?.trim()) {
+			await this.secrets.store(`oaicopilot.adminApiKey.${normalizedProvider}`, adminApiKey.trim());
+		}
 		vscode.window.showInformationMessage(t("host.providerAdded", provider));
 		// Send refresh signal to frontend
 		await this.sendInit();
@@ -626,6 +641,7 @@ export class ConfigViewPanel {
 		headers?: Record<string, string>,
 		sessionIdHeader?: string,
 		balance?: ProviderBalanceConfig
+		, adminApiKey?: string
 	) {
 		const normalizedProvider = canonicalizeProvider(provider);
 		if (!normalizedProvider) {
@@ -674,6 +690,9 @@ export class ConfigViewPanel {
 		if (apiKey?.trim()) {
 			await this.secrets.store(`oaicopilot.apiKey.${normalizedProvider}`, apiKey.trim());
 		}
+		if (adminApiKey?.trim()) {
+			await this.secrets.store(`oaicopilot.adminApiKey.${normalizedProvider}`, adminApiKey.trim());
+		}
 		// The endpoint or extractor may have changed, so the cached number is no longer trustworthy.
 		this.balanceService?.invalidate(normalizedProvider);
 		vscode.window.showInformationMessage(t("host.providerUpdated", provider));
@@ -695,6 +714,7 @@ export class ConfigViewPanel {
 		// Delete the key only after the model update succeeds. An orphaned key is
 		// safer and recoverable; a deleted key paired with live models is not.
 		await this.secrets.delete(`oaicopilot.apiKey.${normalizedProvider}`);
+		await this.secrets.delete(`oaicopilot.adminApiKey.${normalizedProvider}`);
 		vscode.window.showInformationMessage(t("host.providerDeleted", provider));
 		// Send refresh signal to frontend
 		await this.sendInit();
@@ -735,7 +755,7 @@ export class ConfigViewPanel {
 	 * them. This is what the "Test" button calls so users can validate an endpoint
 	 * before committing it.
 	 */
-	private async testBalance(provider: string, balance: ProviderBalanceConfig) {
+	private async testBalance(provider: string, balance: ProviderBalanceConfig, adminApiKey?: string) {
 		const normalizedProvider = canonicalizeProvider(provider);
 		if (!normalizedProvider) {
 			throw new Error("Provider ID is required.");
@@ -743,7 +763,8 @@ export class ConfigViewPanel {
 		const models = getGlobalUserModels(vscode.workspace.getConfiguration());
 		const providerConfiguration = getProviderConfiguration(models, normalizedProvider);
 		const aliases = getGlobalProviderAliases(vscode.workspace.getConfiguration()).get(normalizedProvider) ?? [];
-		const apiKey = (await getProviderApiKey(this.secrets, normalizedProvider, aliases)) || "";
+		const providerKey = (await getProviderApiKey(this.secrets, normalizedProvider, aliases)) || "";
+		const apiKey = balance.credential === "admin" ? adminApiKey?.trim() || (await this.secrets.get(`oaicopilot.adminApiKey.${normalizedProvider}`)) || "" : providerKey;
 		const config = resolveBalanceConfig(normalizeProviderBalance(balance) ?? {});
 		if (!config) {
 			await this.postBalanceOutcome(
@@ -789,6 +810,7 @@ export class ConfigViewPanel {
 				? {
 						result: {
 							label: formatBalanceLabel({ provider, result }),
+							queryType: result.queryType,
 							remaining: result.remaining,
 							total: result.total,
 							used: result.used,

@@ -58,6 +58,17 @@ export function formatBalanceLabel(snapshot: BalanceSnapshot | undefined): strin
 	return "unavailable";
 }
 
+export function formatBalanceKind(queryType?: "balance" | "usage" | "cost"): string {
+	switch (queryType) {
+		case "usage":
+			return "Usage";
+		case "cost":
+			return "Cost";
+		default:
+			return "Balance";
+	}
+}
+
 export function formatBalanceTooltip(snapshot: BalanceSnapshot | undefined): string {
 	if (!snapshot) {
 		return "No balance information yet.";

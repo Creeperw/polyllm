@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import type { BalanceService } from "./service";
-import { formatBalanceLabel, formatBalanceTooltip, getBalanceSeverity } from "./format";
+import { formatBalanceKind, formatBalanceLabel, formatBalanceTooltip, getBalanceSeverity } from "./format";
 import { getGlobalUserModels } from "../utils";
 
 /** Providers that have a balance query enabled, in display order. */
@@ -46,7 +46,7 @@ function severityIcon(severity: ReturnType<typeof getBalanceSeverity>): string {
  */
 export function initBalanceStatusBar(context: vscode.ExtensionContext, service: BalanceService): vscode.StatusBarItem {
 	const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
-	item.name = "PolyLLM Balance";
+		item.name = "PolyLLM Provider Query";
 	item.command = "oaicopilot.showBalances";
 	context.subscriptions.push(item);
 
@@ -62,7 +62,7 @@ export function initBalanceStatusBar(context: vscode.ExtensionContext, service: 
 		item.text = snapshot.refreshing && !snapshot.result ? `$(sync~spin) ${provider}` : `${icon} ${label}`;
 		const tooltip = new vscode.MarkdownString(formatBalanceTooltip(snapshot));
 		tooltip.appendMarkdown(`\n\nProvider: \`${provider}\``);
-		tooltip.appendMarkdown("\n\nClick to list every provider balance.");
+				tooltip.appendMarkdown(`\n\n${formatBalanceKind(snapshot.result?.queryType)} query · click to list every provider query.`);
 		item.tooltip = tooltip;
 		item.show();
 	};
@@ -103,21 +103,21 @@ export async function showProviderBalances(service: BalanceService): Promise<voi
 		return {
 			label: `${icon} ${provider}`,
 			description: snapshot ? formatBalanceLabel(snapshot) : "not queried yet",
-			detail: snapshot?.failure ? snapshot.failure.message : details.join(" · "),
+					detail: snapshot?.failure ? snapshot.failure.message : `${formatBalanceKind(snapshot?.result?.queryType)}${details.length ? ` · ${details.join(" · ")}` : ""}`,
 			provider,
 		};
 	});
 
 	const picked = await vscode.window.showQuickPick(items, {
-		title: "PolyLLM Provider Balances",
-		placeHolder: "Select a provider to refresh its balance",
+			title: "PolyLLM Provider Queries",
+			placeHolder: "Select a provider to refresh its query",
 		matchOnDetail: true,
 	});
 	if (!picked) {
 		return;
 	}
 	await vscode.window.withProgress(
-		{ location: vscode.ProgressLocation.Notification, title: `Querying ${picked.provider} balance…` },
+				{ location: vscode.ProgressLocation.Notification, title: `Querying ${picked.provider}…` },
 		async () => {
 			const snapshot = await service.refresh(picked.provider);
 			if (snapshot.result) {

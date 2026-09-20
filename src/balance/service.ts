@@ -141,7 +141,8 @@ export class BalanceService implements vscode.Disposable {
 
 		const providerRecord = models.find((model) => model.providerConfig === true && model.owned_by === provider);
 		const aliases = getGlobalProviderAliases(config).get(provider) ?? [];
-		const apiKey = (await getProviderApiKey(this.secrets, provider, aliases)) ?? "";
+		const providerKey = (await getProviderApiKey(this.secrets, provider, aliases)) ?? "";
+		const apiKey = balance.credential === "admin" ? (await this.secrets.get(`oaicopilot.adminApiKey.${provider}`)) ?? "" : providerKey;
 
 		const outcome = await queryProviderBalance({
 			config: balance,

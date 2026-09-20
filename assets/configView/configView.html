@@ -680,6 +680,19 @@
 					</button>
 				</div>
 				<div class="modal-body">
+					<div class="query-hero">
+						<div class="query-hero-icon">◒</div>
+						<div>
+							<div class="query-hero-kicker" data-i18n="balance.heroKicker">Provider insights</div>
+							<div class="query-hero-title" data-i18n="balance.heroTitle">Keep credits, usage and spend in one place</div>
+							<div class="query-hero-copy" data-i18n="balance.heroDescription">Choose the meaning of this number first. The status bar will show a compact, clearly labelled result.</div>
+						</div>
+					</div>
+					<div class="query-type-grid" role="group" aria-label="Query type">
+						<label class="query-type-card"><input id="balanceTypeBalance" type="radio" name="balanceQueryType" value="balance" checked /><span class="query-type-title" data-i18n="balance.typeBalance">Account balance</span><span class="query-type-copy" data-i18n="balance.typeBalanceDescription">Credits or money remaining</span></label>
+						<label class="query-type-card"><input id="balanceTypeUsage" type="radio" name="balanceQueryType" value="usage" /><span class="query-type-title" data-i18n="balance.typeUsage">Plan usage</span><span class="query-type-copy" data-i18n="balance.typeUsageDescription">Tokens, requests or quota consumed</span></label>
+						<label class="query-type-card"><input id="balanceTypeCost" type="radio" name="balanceQueryType" value="cost" /><span class="query-type-title" data-i18n="balance.typeCost">Organization cost</span><span class="query-type-copy" data-i18n="balance.typeCostDescription">Spend reported by the provider</span></label>
+					</div>
 					<div class="row">
 						<div class="field">
 							<label for="balanceEnabled" data-i18n="balance.enabledLabel">Enable balance query</label>
@@ -697,7 +710,27 @@
 								<option value="" data-i18n="common.custom">Custom</option>
 							</select>
 						</div>
+						<div class="field">
+							<label for="balanceCredential" data-i18n="balance.credentialLabel">Credential</label>
+							<select id="balanceCredential" class="model-input">
+								<option value="provider" data-i18n="balance.credentialProvider">Provider API key</option>
+								<option value="admin" data-i18n="balance.credentialAdmin">Admin API key</option>
+							</select>
+							<div class="field-description" data-i18n="balance.credentialDescription">Organization reports usually require a separate Admin key.</div>
+						</div>
 					</div>
+					<div id="balanceAdminKeyField" class="query-credential-callout">
+						<div class="query-callout-icon">⚿</div>
+						<div class="query-callout-content"><strong data-i18n="balance.adminKeyTitle">Admin key required</strong><span data-i18n="balance.adminKeyDescription">Enter it once here. It is stored separately from the inference key and is never shown again.</span></div>
+						<input id="balanceAdminApiKey" type="password" class="model-input" data-i18n-placeholder="balance.adminKeyPlaceholder" placeholder="Paste an Admin API key" />
+					</div>
+					<div class="query-window-row">
+						<div class="field"><label for="balanceWindowDays" data-i18n="balance.windowLabel">Reporting window</label><select id="balanceWindowDays" class="model-input"><option value="1" data-i18n="balance.window1">Last 24 hours</option><option value="7" data-i18n="balance.window7">Last 7 days</option><option value="30" data-i18n="balance.window30">Last 30 days</option></select></div>
+						<div class="query-window-note" data-i18n="balance.windowDescription">Usage and cost reports are requested as daily buckets.</div>
+					</div>
+					<details class="query-advanced">
+						<summary><span data-i18n="balance.advancedTitle">Advanced request and extraction</span><span class="query-advanced-hint" data-i18n="balance.advancedHint">For custom providers</span></summary>
+						<div class="query-advanced-content">
 					<div class="row">
 						<div class="field wide">
 							<label for="balanceUrl" data-i18n="balance.urlLabel">Endpoint URL</label>
@@ -780,6 +813,8 @@
 						</div>
 					</div>
 					<div id="balanceTestResult" class="balance-test-result" style="display: none"></div>
+						</div>
+					</details>
 				</div>
 				<div class="modal-footer">
 					<button id="balanceTest" class="secondary" data-i18n="common.test">Test</button>

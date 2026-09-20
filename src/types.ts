@@ -31,9 +31,19 @@ export interface BalanceExtractor {
 export interface ProviderBalanceConfig {
 	/** Whether the query runs at all. Defaults to false. */
 	enabled?: boolean;
+	/** Semantic category of the returned value. */
+	queryType?: "balance" | "usage" | "cost";
+	/** Which stored credential should be sent to the endpoint. */
+	credential?: "provider" | "admin";
+	/** Number of trailing days requested by an organization usage endpoint. */
+	windowDays?: number;
+	/** Date format used by {{startTime}} and {{endTime}} placeholders. */
+	timeFormat?: "iso" | "unix";
+	/** Built-in response normalizer for bucketed organization reports. */
+	adapter?: "openai-usage" | "openai-cost" | "anthropic-usage" | "anthropic-cost";
 	/** Name of a built-in preset, or `"custom"`. Selects the defaults for the fields below. */
 	preset?: string;
-	/** Request URL. Supports `{{baseUrl}}` and `{{apiKey}}`. A relative path is resolved against the provider Base URL. */
+	/** Request URL. Supports `{{baseUrl}}`, `{{apiKey}}`, and time placeholders. A relative path is resolved against the provider Base URL. */
 	url?: string;
 	/** HTTP method. Defaults to `GET`. */
 	method?: string;

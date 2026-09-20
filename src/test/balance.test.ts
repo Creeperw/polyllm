@@ -290,6 +290,22 @@ suite("balance presets", () => {
 				body: { usage: { rolling: { percent: 37 }, weekly: { percent: 62 } } },
 				remaining: 63,
 			},
+			"openai-usage": {
+				body: { data: [{ start_time: 1, results: [{ input_tokens: 120, output_tokens: 80 }] }] },
+				remaining: 200,
+			},
+			"openai-cost": {
+				body: { data: [{ start_time: 1, results: [{ amount: { value: 1.25, currency: "usd" } }] }] },
+				remaining: 1.25,
+			},
+			"anthropic-usage": {
+				body: { data: [{ uncached_input_tokens: 120, output_tokens: 80 }] },
+				remaining: 200,
+			},
+			"anthropic-cost": {
+				body: { data: [{ cost_cents: 125 }] },
+				remaining: 1.25,
+			},
 		};
 		for (const preset of BALANCE_PRESETS) {
 			const sample = samples[preset.id];

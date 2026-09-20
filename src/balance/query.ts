@@ -5,6 +5,7 @@ import { getBalancePreset } from "./presets";
 
 /** A successful balance query. */
 export interface BalanceResult {
+	queryType?: "balance" | "usage" | "cost";
 	remaining?: number;
 	total?: number;
 	used?: number;
@@ -55,7 +56,13 @@ function stripTrailingSlash(value: string): string {
 	return value.replace(/\/+$/, "");
 }
 
-function resolvePlaceholders(template: string, baseUrl: string, apiKey: string): string {
+function resolvePlaceholders(
+	template: string,
+	baseUrl: string,
+	apiKey: string,
+	windowDays = 7,
+	timeFormat: "iso" | "unix" = "iso"
+): string {
 	const normalizedBase = stripTrailingSlash(baseUrl.trim());
 	let origin = "";
 	try {
@@ -64,10 +71,17 @@ function resolvePlaceholders(template: string, baseUrl: string, apiKey: string):
 	} catch {
 		origin = "";
 	}
+	const end = new Date();
+	const start = new Date(end.getTime() - Math.max(1, windowDays) * 24 * 60 * 60 * 1000);
+	const formatTime = (value: Date) => (timeFormat === "unix" ? String(Math.floor(value.getTime() / 1000)) : value.toISOString());
 	return template
 		.replaceAll("{{baseUrl}}", normalizedBase)
 		.replaceAll("{{origin}}", origin)
-		.replaceAll("{{apiKey}}", apiKey);
+		.replaceAll("{{apiKey}}", apiKey)
+		.replaceAll("{{startTime}}", formatTime(start))
+		.replaceAll("{{endTime}}", formatTime(end))
+		.replaceAll("{{startTimeUnix}}", String(Math.floor(start.getTime() / 1000)))
+		.replaceAll("{{endTimeUnix}}", String(Math.floor(end.getTime() / 1000)));
 }
 
 /**
@@ -80,14 +94,16 @@ function resolvePlaceholders(template: string, baseUrl: string, apiKey: string):
 export function resolveBalanceUrl(
 	rawUrl: string | undefined,
 	baseUrl: string | undefined,
-	apiKey: string
+	apiKey: string,
+	windowDays = 7,
+	timeFormat: "iso" | "unix" = "iso"
 ): string | undefined {
 	const template = (rawUrl ?? "").trim();
 	if (!template) {
 		return undefined;
 	}
 	const normalizedBase = stripTrailingSlash((baseUrl ?? "").trim());
-	const replaced = resolvePlaceholders(template, normalizedBase, apiKey);
+	const replaced = resolvePlaceholders(template, normalizedBase, apiKey, windowDays, timeFormat);
 	let candidate: string;
 	if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(replaced)) {
 		// An absolute endpoint stands on its own: a billing host does not have to be
@@ -140,6 +156,79 @@ function describeExpressionError(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
 
+function asFiniteNumber(value: unknown): number | undefined {
+	if (typeof value === "number" && Number.isFinite(value)) {
+		return value;
+	}
+	if (typeof value === "string" && value.trim() !== "") {
+		const parsed = Number(value);
+		return Number.isFinite(parsed) ? parsed : undefined;
+	}
+	return undefined;
+}
+
+function responseBuckets(payload: unknown): readonly Record<string, unknown>[] {
+	if (!payload || typeof payload !== "object" || !Array.isArray((payload as { data?: unknown }).data)) {
+		return [];
+	}
+	return (payload as { data: unknown[] }).data.filter(
+		(value): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value)
+	);
+}
+
+function aggregateOrganizationReport(adapter: ProviderBalanceConfig["adapter"], payload: unknown): BalanceResult | undefined {
+	const buckets = responseBuckets(payload);
+	if (!buckets.length || !adapter) {
+		return undefined;
+	}
+	let total = 0;
+	let found = false;
+	for (const bucket of buckets) {
+		const results = Array.isArray(bucket.results) ? bucket.results : [bucket];
+		for (const entry of results) {
+			if (!entry || typeof entry !== "object") {
+				continue;
+			}
+			const record = entry as Record<string, unknown>;
+			let value: number | undefined;
+			switch (adapter) {
+				case "openai-usage":
+					value = (asFiniteNumber(record.input_tokens) ?? 0) + (asFiniteNumber(record.output_tokens) ?? 0);
+					break;
+				case "openai-cost": {
+					const amount = record.amount && typeof record.amount === "object" ? (record.amount as Record<string, unknown>).value : undefined;
+					value = asFiniteNumber(amount);
+					break;
+				}
+				case "anthropic-usage":
+					value =
+						(asFiniteNumber(record.uncached_input_tokens) ?? 0) +
+						(asFiniteNumber(record.cached_input_tokens) ?? 0) +
+						(asFiniteNumber(record.cache_creation_input_tokens) ?? 0) +
+						(asFiniteNumber(record.output_tokens) ?? 0);
+					break;
+				case "anthropic-cost":
+					value = (asFiniteNumber(record.cost_cents) ?? 0) / 100;
+					break;
+			}
+			if (value !== undefined) {
+				total += value;
+				found = true;
+			}
+		}
+	}
+	if (!found) {
+		return undefined;
+	}
+	return {
+		remaining: total,
+		unit: adapter.endsWith("cost") ? "USD" : "tokens",
+		planName: adapter.startsWith("openai") ? "OpenAI organization" : "Anthropic organization",
+		requestUrl: "",
+		checkedAt: Date.now(),
+	};
+}
+
 /**
  * Run one balance query.
  *
@@ -156,7 +245,17 @@ export async function queryProviderBalance(options: {
 }): Promise<BalanceOutcome> {
 	const { config, baseUrl, apiKey } = options;
 	const resolved = resolveBalanceConfig(config);
-	const requestUrl = resolveBalanceUrl(resolved.url, baseUrl, apiKey);
+	if (resolved.credential === "admin" && !apiKey.trim()) {
+		return {
+			ok: false,
+			failure: {
+				message: "This organization report requires an Admin API key. Add one in the query settings.",
+				transient: false,
+				checkedAt: Date.now(),
+			},
+		};
+	}
+	const requestUrl = resolveBalanceUrl(resolved.url, baseUrl, apiKey, resolved.windowDays, resolved.timeFormat);
 	const checkedAt = Date.now();
 
 	if (!requestUrl) {
@@ -257,6 +356,10 @@ export async function queryProviderBalance(options: {
 	}
 
 	try {
+		const aggregate = aggregateOrganizationReport(resolved.adapter, payload);
+		if (aggregate) {
+			return { ok: true, result: { ...aggregate, requestUrl, checkedAt } };
+		}
 		const remaining = evaluateBalanceNumber(extract.remaining, payload);
 		if (remaining === undefined) {
 			return {
@@ -269,7 +372,8 @@ export async function queryProviderBalance(options: {
 				},
 			};
 		}
-		const result: BalanceResult = {
+				const result: BalanceResult = {
+					queryType: resolved.queryType,
 			remaining,
 			requestUrl,
 			checkedAt,

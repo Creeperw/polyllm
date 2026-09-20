@@ -21,6 +21,11 @@ export interface BalancePreset {
 		url: string;
 		method: string;
 		auth: "bearer" | "x-api-key" | "none";
+		queryType?: "balance" | "usage" | "cost";
+		credential?: "provider" | "admin";
+		windowDays?: number;
+		timeFormat?: "iso" | "unix";
+		adapter?: "openai-usage" | "openai-cost" | "anthropic-usage" | "anthropic-cost";
 		headers?: Record<string, string>;
 		extract: BalanceExtractor;
 	};
@@ -258,6 +263,98 @@ export const BALANCE_PRESETS: readonly BalancePreset[] = [
 			},
 		},
 		urlPatterns: [/opencode\.ai\/zen\/go/i],
+	},
+	// ── Official organization usage and cost reports ────────────────────
+	{
+		id: "openai-usage",
+		label: "OpenAI organization usage",
+		description: "Reads daily token usage for the organization. Requires an OpenAI Admin API key.",
+		baseUrlHint: "Uses the OpenAI organization usage endpoint. The default window is the last 7 days.",
+		config: {
+			url: "https://api.openai.com/v1/organization/usage/completions?start_time={{startTimeUnix}}&end_time={{endTimeUnix}}&bucket_width=1d",
+			method: "GET",
+			auth: "bearer",
+			queryType: "usage",
+			credential: "admin",
+			windowDays: 7,
+			timeFormat: "unix",
+			adapter: "openai-usage",
+			extract: {
+				remaining: "data[0].results[0].input_tokens + data[0].results[0].output_tokens",
+				unit: '"tokens"',
+				planName: '"OpenAI organization (daily buckets)"',
+				extra: "data[0].start_time",
+			},
+		},
+		urlPatterns: [/api\.openai\.com/i],
+	},
+	{
+		id: "openai-cost",
+		label: "OpenAI organization cost",
+		description: "Reads organization spend in USD. Requires an OpenAI Admin API key.",
+		baseUrlHint: "Uses the OpenAI organization costs endpoint. The default window is the last 7 days.",
+		config: {
+			url: "https://api.openai.com/v1/organization/costs?start_time={{startTimeUnix}}&end_time={{endTimeUnix}}&bucket_width=1d",
+			method: "GET",
+			auth: "bearer",
+			queryType: "cost",
+			credential: "admin",
+			windowDays: 7,
+			timeFormat: "unix",
+			adapter: "openai-cost",
+			extract: {
+				remaining: "data[0].results[0].amount.value",
+				unit: '"USD"',
+				planName: '"OpenAI organization (daily costs)"',
+			},
+		},
+		urlPatterns: [/api\.openai\.com/i],
+	},
+	{
+		id: "anthropic-usage",
+		label: "Anthropic organization usage",
+		description: "Reads organization message-token usage. Requires an Anthropic Admin API key.",
+		baseUrlHint: "Uses the Anthropic usage report endpoint. The default window is the last 7 days.",
+		config: {
+			url: "https://api.anthropic.com/v1/organizations/usage_report/messages?starting_at={{startTime}}&ending_at={{endTime}}&bucket_width=1d",
+			method: "GET",
+			auth: "x-api-key",
+			queryType: "usage",
+			credential: "admin",
+			windowDays: 7,
+			timeFormat: "iso",
+			adapter: "anthropic-usage",
+			headers: { "anthropic-version": "2023-06-01" },
+			extract: {
+				remaining: "data[0].uncached_input_tokens + data[0].output_tokens",
+				unit: '"tokens"',
+				planName: '"Anthropic organization (daily buckets)"',
+			},
+		},
+		urlPatterns: [/api\.anthropic\.com/i],
+	},
+	{
+		id: "anthropic-cost",
+		label: "Anthropic organization cost",
+		description: "Reads organization spend in USD. Requires an Anthropic Admin API key.",
+		baseUrlHint: "Uses the Anthropic cost report endpoint. The default window is the last 7 days.",
+		config: {
+			url: "https://api.anthropic.com/v1/organizations/cost_report?starting_at={{startTime}}&ending_at={{endTime}}&bucket_width=1d",
+			method: "GET",
+			auth: "x-api-key",
+			queryType: "cost",
+			credential: "admin",
+			windowDays: 7,
+			timeFormat: "iso",
+			adapter: "anthropic-cost",
+			headers: { "anthropic-version": "2023-06-01" },
+			extract: {
+				remaining: "data[0].cost_cents / 100",
+				unit: '"USD"',
+				planName: '"Anthropic organization (daily costs)"',
+			},
+		},
+		urlPatterns: [/api\.anthropic\.com/i],
 	},
 ];
 

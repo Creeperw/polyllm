@@ -171,6 +171,17 @@ export function normalizeProviderBalance(balance: unknown): ProviderBalanceConfi
 
 	const auth =
 		source.auth === "bearer" || source.auth === "x-api-key" || source.auth === "none" ? source.auth : undefined;
+	const queryType = source.queryType === "usage" || source.queryType === "cost" || source.queryType === "balance" ? source.queryType : undefined;
+	const credential = source.credential === "admin" || source.credential === "provider" ? source.credential : undefined;
+	const windowDays =
+		typeof source.windowDays === "number" && Number.isFinite(source.windowDays) && source.windowDays >= 1 && source.windowDays <= 31
+			? Math.floor(source.windowDays)
+			: undefined;
+	const timeFormat = source.timeFormat === "unix" || source.timeFormat === "iso" ? source.timeFormat : undefined;
+	const adapter =
+		source.adapter === "openai-usage" || source.adapter === "openai-cost" || source.adapter === "anthropic-usage" || source.adapter === "anthropic-cost"
+			? source.adapter
+			: undefined;
 	const timeoutMs =
 		typeof source.timeoutMs === "number" && Number.isFinite(source.timeoutMs) && source.timeoutMs > 0
 			? Math.floor(source.timeoutMs)
@@ -182,6 +193,11 @@ export function normalizeProviderBalance(balance: unknown): ProviderBalanceConfi
 
 	const normalized: ProviderBalanceConfig = {
 		...(source.enabled === true ? { enabled: true } : {}),
+		...(queryType ? { queryType } : {}),
+		...(credential ? { credential } : {}),
+		...(windowDays ? { windowDays } : {}),
+		...(timeFormat ? { timeFormat } : {}),
+		...(adapter ? { adapter } : {}),
 		...(pick(source.preset) ? { preset: pick(source.preset)! } : {}),
 		...(pick(source.url) ? { url: pick(source.url)! } : {}),
 		...(pick(source.method) ? { method: pick(source.method)!.toUpperCase() } : {}),

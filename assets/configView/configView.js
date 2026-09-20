@@ -118,6 +118,11 @@ const balanceModalTitle = document.getElementById("balanceModalTitle");
 const balanceEnabledInput = document.getElementById("balanceEnabled");
 const balancePresetInput = document.getElementById("balancePreset");
 const balancePresetHint = document.getElementById("balancePresetHint");
+const balanceTypeInputs = [...document.querySelectorAll('input[name="balanceQueryType"]')];
+const balanceCredentialInput = document.getElementById("balanceCredential");
+const balanceAdminKeyField = document.getElementById("balanceAdminKeyField");
+const balanceAdminApiKeyInput = document.getElementById("balanceAdminApiKey");
+const balanceWindowDaysInput = document.getElementById("balanceWindowDays");
 const balanceUrlInput = document.getElementById("balanceUrl");
 const balanceMethodInput = document.getElementById("balanceMethod");
 const balanceAuthInput = document.getElementById("balanceAuth");
@@ -469,7 +474,7 @@ window.addEventListener("message", (event) => {
 
 	switch (message.type) {
 		case "init":
-			const { delay, readFileLines, retry, commitModel, models, providerKeys, commitLanguage } = message.payload;
+			const { delay, readFileLines, retry, commitModel, models, providerKeys, adminKeys, commitLanguage } = message.payload;
 			state.delay = delay || 0;
 			state.readFileLines = readFileLines || 0;
 			state.retry = retry || {
@@ -481,6 +486,7 @@ window.addEventListener("message", (event) => {
 			state.models = models || [];
 			state.commitModel = commitModel || "";
 			state.providerKeys = providerKeys || {};
+			state.adminKeys = adminKeys || {};
 			// The host owns the catalogue, so the language arrives with every init.
 			state.locale = message.payload.locale || "en";
 			state.locales = message.payload.locales || [];
@@ -952,11 +958,28 @@ function updateBalancePresetHint() {
 		: t("balance.presetDescription");
 }
 
+function selectedBalanceQueryType() {
+	return balanceTypeInputs.find((input) => input.checked)?.value || "balance";
+}
+
+function updateBalanceQueryControls() {
+	const admin = balanceCredentialInput.value === "admin";
+	balanceAdminKeyField.hidden = !admin;
+	const reports = selectedBalanceQueryType() !== "balance";
+	document.querySelector(".query-window-row").hidden = !reports;
+}
+
 function openBalanceModal(provider) {
 	balanceModalProvider = provider;
 	const config = providerConfigOf(provider).balance || {};
 	balanceModalTitle.textContent = t("balance.modalTitleFor", provider);
 	balanceEnabledInput.checked = config.enabled === true;
+	balanceTypeInputs.forEach((input) => {
+		input.checked = (config.queryType || "balance") === input.value;
+	});
+	balanceCredentialInput.value = config.credential || "provider";
+	balanceAdminApiKeyInput.value = "";
+	balanceWindowDaysInput.value = String(config.windowDays || 7);
 	balancePresetInput.value = config.preset || "";
 	balanceUrlInput.value = config.url || "";
 	balanceMethodInput.value = (config.method || "GET").toUpperCase();
@@ -973,6 +996,7 @@ function openBalanceModal(provider) {
 	balanceIntervalInput.value = config.intervalMinutes || "";
 	hideBalanceTestResult();
 	updateBalancePresetHint();
+	updateBalanceQueryControls();
 	balanceModal.style.display = "flex";
 }
 
@@ -1001,12 +1025,22 @@ function applyBalancePresetDefaults() {
 	fill(balanceTotalInput, preset.config.extract.total);
 	fill(balanceUsedInput, preset.config.extract.used);
 	fill(balanceExtraInput, preset.config.extract.extra);
+	if (preset.config.queryType) {
+		balanceTypeInputs.forEach((input) => (input.checked = preset.config.queryType === input.value));
+	}
+	if (preset.config.credential) {
+		balanceCredentialInput.value = preset.config.credential;
+	}
+	if (preset.config.windowDays) {
+		balanceWindowDaysInput.value = String(preset.config.windowDays);
+	}
 	if (!balanceHeadersInput.value.trim() && preset.config.headers) {
 		balanceHeadersInput.value = JSON.stringify(preset.config.headers, null, 2);
 	}
 	// Picking a preset is a statement of intent, so switch the query on rather
 	// than letting Save silently store an inactive configuration.
 	balanceEnabledInput.checked = true;
+	updateBalanceQueryControls();
 }
 
 /** Read the dialog into a `ProviderBalanceConfig`, or report the first problem. */
@@ -1038,6 +1072,9 @@ function collectBalanceConfig() {
 	};
 	const config = {
 		enabled: balanceEnabledInput.checked,
+		queryType: selectedBalanceQueryType(),
+		credential: balanceCredentialInput.value,
+		windowDays: Number(balanceWindowDaysInput.value) || undefined,
 		preset: balancePresetInput.value || undefined,
 		url: text(balanceUrlInput),
 		method: balanceMethodInput.value,
@@ -1047,7 +1084,7 @@ function collectBalanceConfig() {
 		timeoutMs: number(balanceTimeoutInput),
 		intervalMinutes: number(balanceIntervalInput),
 	};
-	return { ok: true, value: config };
+	return { ok: true, value: config, adminApiKey: balanceAdminApiKeyInput.value.trim() || undefined };
 }
 
 function hideBalanceTestResult() {
@@ -1127,6 +1164,7 @@ function saveBalanceConfig() {
 			headers: parsedHeaders.value,
 			sessionIdHeader: providerData.sessionIdHeader,
 			balance: collected.value,
+			adminApiKey: collected.adminApiKey,
 		},
 		() => {
 			// Show the new configuration at once, then let the host's init refresh
@@ -1149,6 +1187,9 @@ balancePresetInput.addEventListener("change", () => {
 	hideBalanceTestResult();
 });
 
+balanceCredentialInput.addEventListener("change", updateBalanceQueryControls);
+balanceTypeInputs.forEach((input) => input.addEventListener("change", updateBalanceQueryControls));
+
 document.getElementById("balanceTest").addEventListener("click", () => {
 	if (!balanceModalProvider) {
 		return;
@@ -1162,7 +1203,7 @@ document.getElementById("balanceTest").addEventListener("click", () => {
 	balanceTestResultElement.className = "balance-test-result pending";
 	balanceTestResultElement.textContent = t("balance.statusQuerying");
 	balanceTestResultElement.style.display = "block";
-	vscode.postMessage({ type: "testBalance", provider: balanceModalProvider, balance: collected.value });
+	vscode.postMessage({ type: "testBalance", provider: balanceModalProvider, balance: collected.value, adminApiKey: collected.adminApiKey });
 });
 
 document.getElementById("balanceSave").addEventListener("click", saveBalanceConfig);
@@ -1511,7 +1552,8 @@ function commitReasoningEffort(select) {
 function bindReasoningEffortEditors() {
 	document.querySelectorAll(".model-cell-select").forEach((select) => {
 		select.addEventListener("change", () => commitReasoningEffort(select));
-	});
+			balance: collected.value,
+			adminApiKey: collected.adminApiKey,
 }
 
 /**
