@@ -1552,8 +1552,7 @@ function commitReasoningEffort(select) {
 function bindReasoningEffortEditors() {
 	document.querySelectorAll(".model-cell-select").forEach((select) => {
 		select.addEventListener("change", () => commitReasoningEffort(select));
-			balance: collected.value,
-			adminApiKey: collected.adminApiKey,
+	});
 }
 
 /**

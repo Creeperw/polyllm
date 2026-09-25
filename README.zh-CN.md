@@ -56,17 +56,21 @@
 而不影响它们各自的温度或请求间隔。批量添加时输入的显示名称不会生效，每个模型各自使用默认名称。
 
 ## 环境要求
-- VS Code 1.120.0 或更高版本。
+- VS Code Insiders 1.120.0 或更高版本，且需为 `creeperw.polyllm` 启用 `chatProvider` 提案 API。
 - OpenAI 兼容供应商的 API 密钥。
 
 ## ⚡ 快速开始
 1. 从[最新 Release](https://github.com/Creeperw/polyllm/releases/latest)安装 PolyLLM 扩展：
-   下载 `extension.vsix`，然后在命令面板运行 **Extensions: Install from VSIX...**。
+    下载 `extension.vsix`，然后在 VS Code Insiders 中通过命令面板运行 **Extensions: Install from VSIX...**。
    Marketplace 上架仍在审核中。
-2. 从命令面板运行 **PolyLLM: Open Configuration UI**。
-3. 添加供应商，并填写其 Base URL、API Key 和 API 模式。
-4. 添加模型，为每个模型填写全局唯一的 Display Name。
-5. 打开 GitHub Copilot Chat 并选择配置好的模型。
+2. 退出并用 `code-insiders . --enable-proposed-api=creeperw.polyllm` 重新启动 VS Code Insiders；
+    或运行 **Preferences: Configure Runtime Arguments**，在打开的文件中添加
+    `"enable-proposed-api": ["creeperw.polyllm"]`，然后重启。VSIX 安装不会默认启用本扩展所需的
+    `chatProvider` 提案 API。
+3. 从命令面板运行 **PolyLLM: Open Configuration UI**。
+4. 添加供应商，并填写其 Base URL、API Key 和 API 模式。
+5. 添加模型，为每个模型填写全局唯一的 Display Name。
+6. 打开 GitHub Copilot Chat 并选择配置好的模型。
 
 ### 配置示例
 

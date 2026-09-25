@@ -36,7 +36,7 @@
 		"type": "git",
 		"url": "https://github.com/Creeperw/polyllm"
 	},
-	"version": "0.6.0",
+	"version": "0.6.1",
 	"engines": {
 		"vscode": "^1.120.0"
 	},
@@ -627,13 +627,14 @@
 	},
 	"main": "./out/extension.js",
 	"scripts": {
-		"vscode:prepublish": "npm run compile",
+		"vscode:prepublish": "npm run check:webview && npm run compile",
 		"download-api": "dts dev && mv vscode.proposed.*.ts src",
+		"check:webview": "node --check assets/configView/configView.js",
 		"compile": "tsc -p ./",
 		"lint": "eslint",
 		"format": "prettier --write .",
 		"watch": "tsc -watch -p ./",
-		"test": "npm run compile && vscode-test",
+		"test": "npm run check:webview && npm run compile && vscode-test",
 		"build": "vsce package -o extension.vsix"
 	},
 	"dependencies": {

@@ -2,6 +2,12 @@
 
 > This project is a fork of [OAI Compatible Provider for Copilot](https://github.com/JohnnyZ93/oai-compatible-copilot), published as **PolyLLM** (`creeperw.polyllm`). Entries below 0.4.3 come from the upstream project.
 
+## 0.6.1
+
+- Fix a syntax error that prevented the configuration page from initializing, translating text, or responding to buttons in the 0.6.0 VSIX.
+- Check the webview JavaScript syntax during tests and before packaging to prevent a broken VSIX release.
+- Document how to enable the proposed `chatProvider` API when installing from VSIX.
+
 ## 0.6.0 (2026-09-21)
 
 ### Provider query center

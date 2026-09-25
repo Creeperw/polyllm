@@ -62,17 +62,20 @@ their individual temperature or delay. A batch add ignores a typed Display Name 
 own default.
 
 ## Requirements
-- VS Code 1.120.0 or higher.
+- VS Code Insiders 1.120.0 or higher with the `chatProvider` proposed API enabled for `creeperw.polyllm`.
 - OpenAI-compatible provider API key.
 
 ## ⚡ Quick Start
 1. Install the PolyLLM extension from the [latest release](https://github.com/Creeperw/polyllm/releases/latest):
-   download `extension.vsix`, then run **Extensions: Install from VSIX...** from the Command Palette.
+    download `extension.vsix`, then run **Extensions: Install from VSIX...** in VS Code Insiders.
    The Marketplace listing is still under review.
-2. Run **PolyLLM: Open Configuration UI** from the Command Palette.
-3. Add a provider with its Base URL, API Key, and API mode.
-4. Add one or more models with globally unique Display Names.
-5. Open GitHub Copilot Chat and select the configured model.
+2. Quit and restart VS Code Insiders with `code-insiders . --enable-proposed-api=creeperw.polyllm`, or add
+    `"enable-proposed-api": ["creeperw.polyllm"]` to the file opened by **Preferences: Configure Runtime Arguments**
+    and restart. The extension uses the proposed `chatProvider` API, which is not enabled for VSIX installs by default.
+3. Run **PolyLLM: Open Configuration UI** from the Command Palette.
+4. Add a provider with its Base URL, API Key, and API mode.
+5. Add one or more models with globally unique Display Names.
+6. Open GitHub Copilot Chat and select the configured model.
 
 ### Settings Example
 
